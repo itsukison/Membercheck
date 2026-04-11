@@ -3,17 +3,35 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calendar, Users, Briefcase, LayoutDashboard, ClipboardCheck, LogOut, CalendarDays, PanelLeftClose, Menu } from 'lucide-react';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <PortalShell>{children}</PortalShell>
+    </AuthProvider>
+  );
+}
+
+function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  
+  const { member, loading, signOut } = useAuth();
+
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Overview', href: '/overview', icon: CalendarDays },
     { name: 'Bookings', href: '/bookings', icon: Briefcase },
     { name: 'Team Members', href: '/admin/members', icon: Users },
   ];
+
+  if (loading || !member) {
+    return (
+      <div className="h-screen w-full bg-[#fcfbf9] flex items-center justify-center">
+        <div className="text-[#777] font-medium">Verifying session…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-full bg-[#fcfbf9] flex flex-col md:flex-row overflow-hidden">
@@ -22,7 +40,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="p-8 flex items-center justify-between">
           <div>
             <h1 className="font-serif text-2xl text-[#111]">Shion</h1>
-            <p className="text-xs text-[#777] uppercase tracking-widest mt-1">Team Portal</p>
+            <p className="text-xs text-[#777] uppercase tracking-widest mt-1">{member.name}</p>
           </div>
           <button 
             onClick={() => setIsCollapsed(true)} 
@@ -48,10 +66,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           })}
         </nav>
         <div className="p-4 mt-auto border-t border-[#e8e6e1] flex-shrink-0">
-          <Link href="/login" className="flex items-center space-x-3 px-4 py-3 text-[#777] hover:text-[#111] transition-colors">
+          <button
+            onClick={signOut}
+            className="flex items-center space-x-3 px-4 py-3 text-[#777] hover:text-[#111] transition-colors w-full text-left"
+          >
             <LogOut size={18} strokeWidth={1.5} />
             <span className="font-medium text-sm">Sign Out</span>
-          </Link>
+          </button>
         </div>
       </aside>
 

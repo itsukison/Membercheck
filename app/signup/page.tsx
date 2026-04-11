@@ -3,25 +3,28 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { CustomSelect } from '@/components/ui/custom-select';
 
-export default function Login() {
+export default function Signup() {
   const router = useRouter();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [studioCode, setStudioCode] = useState('');
+  const [role, setRole] = useState<'Photographer' | 'Leader'>('Photographer');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If already signed in as a valid staff member, skip to dashboard
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const { data: member } = await supabase
         .from('members')
-        .select('id')
+        .select('id, status')
         .eq('id', session.user.id)
         .maybeSingle();
-      if (member) router.replace('/dashboard');
+      if (member && member.status === 'Active') router.replace('/dashboard');
     })();
   }, [router]);
 
@@ -30,34 +33,26 @@ export default function Login() {
     setError(null);
     setLoading(true);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, studioCode, role }),
+    });
+
+    if (!res.ok) {
+      const { error: errMsg } = await res.json().catch(() => ({ error: 'Unknown error' }));
+      setError(errMsg ?? 'Failed to create account.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
       password,
     });
 
-    if (signInError || !data.session) {
-      setError('Invalid email or password.');
-      setLoading(false);
-      return;
-    }
-
-    // Verify the authenticated user is a staff member
-    const { data: member, error: memberError } = await supabase
-      .from('members')
-      .select('id, status')
-      .eq('id', data.session.user.id)
-      .maybeSingle();
-
-    if (memberError || !member) {
-      await supabase.auth.signOut();
-      setError('This account is not authorized for the team portal.');
-      setLoading(false);
-      return;
-    }
-
-    if (member.status !== 'Active') {
-      await supabase.auth.signOut();
-      setError(`Your account status is ${member.status}. Please contact your team lead.`);
+    if (signInError) {
+      setError('Account created, but auto sign-in failed. Please sign in manually.');
       setLoading(false);
       return;
     }
@@ -81,9 +76,20 @@ export default function Login() {
         className="relative z-10 w-full max-w-md bg-[#fcfbf9] p-10 border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)]"
       >
         <h1 className="font-serif text-4xl text-[#111] mb-2">Team Portal</h1>
-        <p className="text-[#777] mb-8">Sign in to manage your schedule.</p>
+        <p className="text-[#777] mb-8">Create your account.</p>
 
         <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-[#111] mb-2">Full Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full bg-transparent border-b-2 border-[#111] py-2 focus:outline-none focus:border-[#ff4d94] transition-colors rounded-none"
+              placeholder="Your name"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-[#111] mb-2">Email</label>
             <input
@@ -101,9 +107,32 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
               required
               className="w-full bg-transparent border-b-2 border-[#111] py-2 focus:outline-none focus:border-[#ff4d94] transition-colors rounded-none"
-              placeholder="••••••••"
+              placeholder="Min 8 characters"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#111] mb-2">Studio Code</label>
+            <input
+              type="password"
+              value={studioCode}
+              onChange={(e) => setStudioCode(e.target.value)}
+              required
+              className="w-full bg-transparent border-b-2 border-[#111] py-2 focus:outline-none focus:border-[#ff4d94] transition-colors rounded-none"
+              placeholder="Provided by your studio lead"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#111] mb-2">Role</label>
+            <CustomSelect
+              value={role}
+              onChange={(val: string) => setRole(val as 'Photographer' | 'Leader')}
+              options={[
+                { label: 'Photographer', value: 'Photographer' },
+                { label: 'Leader', value: 'Leader' }
+              ]}
             />
           </div>
 
@@ -118,13 +147,13 @@ export default function Login() {
             disabled={loading}
             className="block w-full bg-[#111] text-white text-center py-3 font-medium hover:bg-[#ff4d94] transition-colors mt-8 disabled:opacity-50"
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading ? 'Creating account…' : 'Create Account'}
           </button>
 
           <p className="text-center text-sm text-[#777]">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-[#111] hover:text-[#ff4d94] transition-colors font-medium">
-              Create one →
+            Already have an account?{' '}
+            <Link href="/login" className="text-[#111] hover:text-[#ff4d94] transition-colors font-medium">
+              Sign in →
             </Link>
           </p>
         </div>
