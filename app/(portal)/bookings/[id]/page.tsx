@@ -15,18 +15,35 @@ type BookingDetail = {
   special_requests: string;
   retouch_notes: string;
   date: string;
-  start_hour: number;
-  end_hour: number;
+  start_minutes: number;
+  end_minutes: number;
   extra_duration_minutes: number;
   group_size: number;
   status: string;
   payment_confirmed: boolean;
+  payment_status: string;
   total_price: number;
+  refund_amount_cents: number;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_refund_id: string | null;
+  refunded_at: string | null;
+  cancelled_at: string | null;
+  cancelled_reason: string | null;
   plan: { name: string; duration_minutes: number } | null;
   location: { name: string } | null;
   assigned_member: { id: string; name: string } | null;
   booking_addons: { price_snapshot: number; addon: { name: string } | null }[];
 };
+
+async function authedFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const headers = new Headers(init?.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  return fetch(input, { ...init, headers });
+}
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -35,7 +52,28 @@ function formatDate(dateStr: string) {
 
 function statusLabel(s: string) {
   if (s === 'pending_confirmation') return 'Pending';
+  if (s === 'pending_payment') return 'Awaiting Payment';
+  if (s === 'pending_reschedule_confirmation') return 'Reschedule Pending';
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function paymentStatusLabel(p: string) {
+  switch (p) {
+    case 'paid': return 'Paid';
+    case 'refunded': return 'Refunded';
+    case 'partially_refunded': return 'Partially Refunded';
+    case 'failed': return 'Failed';
+    case 'disputed': return 'Disputed';
+    case 'pending':
+    default: return 'Unpaid';
+  }
+}
+
+function paymentStatusTone(p: string) {
+  if (p === 'paid') return 'bg-green-100 text-green-800 border border-green-300';
+  if (p === 'refunded' || p === 'partially_refunded') return 'bg-blue-100 text-blue-800 border border-blue-300';
+  if (p === 'disputed') return 'bg-red-100 text-red-800 border border-red-300';
+  return 'bg-[#fcfbf9] text-[#777] border border-[#e8e6e1]';
 }
 
 export default function BookingDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -45,6 +83,11 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [refundCancelBooking, setRefundCancelBooking] = useState(true);
+  const [refundBusy, setRefundBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,8 +95,10 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
       .from('bookings')
       .select(`
         id, reference, client_name, client_email, client_phone, client_country,
-        special_requests, retouch_notes, date, start_hour, end_hour,
-        extra_duration_minutes, group_size, status, payment_confirmed, total_price,
+        special_requests, retouch_notes, date, start_minutes, end_minutes,
+        extra_duration_minutes, group_size, status, payment_confirmed, payment_status,
+        total_price, refund_amount_cents, stripe_payment_intent_id, stripe_charge_id,
+        stripe_refund_id, refunded_at, cancelled_at, cancelled_reason,
         plan:plans(name, duration_minutes),
         location:locations(name),
         assigned_member:members!bookings_assigned_member_id_fkey(id, name),
@@ -86,16 +131,32 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
     await load();
   };
 
-  const togglePayment = async () => {
+  const submitRefund = async () => {
     if (!b) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from('bookings')
-      .update({ payment_confirmed: !b.payment_confirmed })
-      .eq('id', b.id);
-    setSaving(false);
-    if (error) { setError(error.message); return; }
-    await load();
+    const amountCents = refundAmount ? Math.round(parseFloat(refundAmount) * 100) : undefined;
+    if (refundAmount && (!amountCents || amountCents <= 0)) {
+      setError('Refund amount must be a positive number.');
+      return;
+    }
+    setRefundBusy(true);
+    setError(null);
+    try {
+      const res = await authedFetch(`/api/admin/bookings/${b.id}/refund`, {
+        method: 'POST',
+        body: JSON.stringify({ amountCents, reason: refundReason, cancelBooking: refundCancelBooking }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({})) as { error?: string };
+        setError(payload.error ?? 'Refund failed.');
+        return;
+      }
+      setRefundOpen(false);
+      setRefundAmount('');
+      setRefundReason('');
+      await load();
+    } finally {
+      setRefundBusy(false);
+    }
   };
 
   if (loading) {
@@ -166,7 +227,7 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
                 <span className="block text-sm text-[#777] mb-1">Time</span>
                 <div className="flex items-center space-x-2 text-[#111] font-medium">
                   <Clock size={18} className="text-[#ff4d94]" />
-                  <span>{b.start_hour.toString().padStart(2, '0')}:00 - {b.end_hour.toString().padStart(2, '0')}:00 ({durationLabel})</span>
+                  <span>{`${String(Math.floor(b.start_minutes/60)).padStart(2,'0')}:${String(b.start_minutes%60).padStart(2,'0')}`} - {`${String(Math.floor(b.end_minutes/60)).padStart(2,'0')}:${String(b.end_minutes%60).padStart(2,'0')}`} ({durationLabel})</span>
                 </div>
               </div>
               <div className="sm:col-span-2">
@@ -230,13 +291,30 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
           </section>
 
           <section className="bg-[#fcfbf9] border border-[#111] p-6">
-            <h3 className="font-serif text-xl text-[#111] mb-4">Payment</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-serif text-xl text-[#111]">Payment</h3>
+              <span className={`px-2 py-1 text-xs font-medium ${paymentStatusTone(b.payment_status)}`}>
+                {paymentStatusLabel(b.payment_status)}
+              </span>
+            </div>
             <div className="flex items-center justify-between">
-              <span className="text-[#777] text-sm">Total</span>
+              <span className="text-[#777] text-sm">Total Charged</span>
               <span className="text-[#111] font-bold text-xl">${b.total_price}</span>
             </div>
+            {b.refund_amount_cents > 0 && (
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[#777] text-sm">Refunded</span>
+                <span className="text-blue-700 font-medium">-${(b.refund_amount_cents / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#e8e6e1]">
+              <span className="text-[#777] text-sm">Net</span>
+              <span className="text-[#111] font-bold">${(b.total_price - b.refund_amount_cents / 100).toFixed(2)}</span>
+            </div>
+
             {b.booking_addons.length > 0 && (
               <div className="mt-4 pt-4 border-t border-[#e8e6e1] space-y-2">
+                <span className="block text-xs text-[#777] uppercase tracking-wider">Add-ons</span>
                 {b.booking_addons.map((ba, i) => (
                   <div key={i} className="flex justify-between text-sm">
                     <span className="text-[#777]">{ba.addon?.name ?? 'Add-on'}</span>
@@ -245,24 +323,97 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
                 ))}
               </div>
             )}
+
+            {(b.stripe_payment_intent_id || b.stripe_charge_id || b.stripe_refund_id) && (
+              <div className="mt-4 pt-4 border-t border-[#e8e6e1] space-y-2 text-[11px] font-mono text-[#777] break-all">
+                {b.stripe_payment_intent_id && (
+                  <div><span className="block text-[#aaa] uppercase">Payment Intent</span>{b.stripe_payment_intent_id}</div>
+                )}
+                {b.stripe_charge_id && (
+                  <div><span className="block text-[#aaa] uppercase">Charge</span>{b.stripe_charge_id}</div>
+                )}
+                {b.stripe_refund_id && (
+                  <div><span className="block text-[#aaa] uppercase">Last Refund</span>{b.stripe_refund_id}</div>
+                )}
+              </div>
+            )}
           </section>
+
+          {canEdit && b.payment_status === 'paid' && b.status !== 'cancelled' && (
+            <section>
+              {!refundOpen ? (
+                <button
+                  onClick={() => { setRefundOpen(true); setRefundCancelBooking(true); setRefundAmount(''); }}
+                  className="w-full border border-[#ff4d94] text-[#ff4d94] py-3 font-medium hover:bg-[#ff4d94] hover:text-white transition-colors"
+                >
+                  Issue Refund
+                </button>
+              ) : (
+                <div className="border border-[#111] bg-white p-5 space-y-4">
+                  <div>
+                    <label className="block text-xs text-[#777] uppercase tracking-wider mb-2">Amount (USD, leave empty for full remaining)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={`Remaining: $${(b.total_price - b.refund_amount_cents / 100).toFixed(2)}`}
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      className="w-full border border-[#e8e6e1] px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#777] uppercase tracking-wider mb-2">Reason (optional)</label>
+                    <input
+                      type="text"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className="w-full border border-[#e8e6e1] px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-[#444]">
+                    <input
+                      type="checkbox"
+                      checked={refundCancelBooking}
+                      onChange={(e) => setRefundCancelBooking(e.target.checked)}
+                    />
+                    <span>Also cancel this booking</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={submitRefund}
+                      disabled={refundBusy}
+                      className="flex-1 bg-[#111] text-white py-2 text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50"
+                    >
+                      {refundBusy ? 'Processing…' : 'Issue Refund'}
+                    </button>
+                    <button
+                      onClick={() => { setRefundOpen(false); setRefundAmount(''); setRefundReason(''); setError(null); }}
+                      className="flex-1 border border-[#111] text-[#111] py-2 text-sm font-medium hover:bg-[#111] hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#777] leading-relaxed">Refund is issued to the customer&apos;s original payment method and typically settles within 5–10 business days.</p>
+                </div>
+              )}
+            </section>
+          )}
 
           {canEdit && (
             <section className="space-y-3">
-              <button
-                onClick={togglePayment}
-                disabled={saving}
-                className="w-full border border-[#111] bg-white py-3 font-medium text-[#111] hover:bg-[#111] hover:text-white transition-colors disabled:opacity-50"
-              >
-                {b.payment_confirmed ? 'Mark Payment Unpaid' : 'Mark Payment Confirmed'}
-              </button>
-              {b.status === 'pending_confirmation' && (
+              {b.status === 'pending_reschedule_confirmation' && (
+                <div className="border border-violet-300 bg-violet-50 p-3 text-sm text-violet-800 font-medium mb-1">
+                  ↻ Customer rescheduled — please review the new date and confirm.
+                </div>
+              )}
+              {(b.status === 'pending_confirmation' || b.status === 'pending_reschedule_confirmation') && (
                 <button
                   onClick={() => updateStatus('confirmed')}
                   disabled={saving}
                   className="w-full border border-[#111] bg-white py-3 font-medium text-[#111] hover:bg-[#111] hover:text-white transition-colors disabled:opacity-50"
                 >
-                  Confirm Booking
+                  {b.status === 'pending_reschedule_confirmation' ? 'Confirm Reschedule' : 'Confirm Booking'}
                 </button>
               )}
               {b.status === 'confirmed' && (
@@ -274,7 +425,7 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
                   Mark as Completed
                 </button>
               )}
-              {b.status !== 'cancelled' && b.status !== 'completed' && (
+              {b.status !== 'cancelled' && b.status !== 'completed' && b.payment_status !== 'paid' && (
                 <button
                   onClick={() => updateStatus('cancelled')}
                   disabled={saving}
@@ -282,6 +433,9 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
                 >
                   Cancel Booking
                 </button>
+              )}
+              {b.status !== 'cancelled' && b.status !== 'completed' && b.payment_status === 'paid' && (
+                <p className="text-xs text-[#777] text-center">To cancel a paid booking, use &ldquo;Issue Refund&rdquo; above and select &ldquo;Also cancel this booking&rdquo;.</p>
               )}
             </section>
           )}

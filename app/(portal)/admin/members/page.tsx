@@ -12,7 +12,10 @@ type Member = {
   role: 'Photographer' | 'Leader';
   email: string;
   status: 'Active' | 'On Leave' | 'Inactive';
+  color: string;
 };
+
+const PALETTE_COLORS = ['#ff4d94', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 
 export default function AdminMembers() {
   const { member: currentMember } = useAuth();
@@ -24,6 +27,7 @@ export default function AdminMembers() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [role, setRole] = useState<'Photographer' | 'Leader'>('Photographer');
   const [status, setStatus] = useState<'Active' | 'On Leave' | 'Inactive'>('Active');
+  const [color, setColor] = useState('#3b82f6');
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -31,7 +35,7 @@ export default function AdminMembers() {
     setLoading(true);
     const { data, error } = await supabase
       .from('members')
-      .select('id, name, role, email, status')
+      .select('id, name, role, email, status, color')
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -51,6 +55,7 @@ export default function AdminMembers() {
     setEditingMember(null);
     setRole('Photographer');
     setStatus('Active');
+    setColor('#3b82f6');
     setModalError(null);
     setIsModalOpen(true);
   };
@@ -59,6 +64,7 @@ export default function AdminMembers() {
     setEditingMember(m);
     setRole(m.role);
     setStatus(m.status);
+    setColor(m.color ?? '#3b82f6');
     setModalError(null);
     setIsModalOpen(true);
   };
@@ -74,7 +80,7 @@ export default function AdminMembers() {
     if (editingMember) {
       const { error } = await supabase
         .from('members')
-        .update({ name, role, status })
+        .update({ name, role, status, color })
         .eq('id', editingMember.id);
 
       if (error) {
@@ -164,7 +170,12 @@ export default function AdminMembers() {
               ) : (
                 members.map((m) => (
                   <tr key={m.id} className="border-b border-[#e8e6e1] hover:bg-[#fcfbf9]/50 transition-colors">
-                    <td className="p-4 text-[#111] font-medium">{m.name}</td>
+                    <td className="p-4 text-[#111] font-medium">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: m.color ?? '#3b82f6' }} />
+                        <span>{m.name}</span>
+                      </div>
+                    </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 text-xs font-medium border ${m.role === 'Leader' ? 'border-[#ff4d94] text-[#ff4d94]' : 'border-[#111] text-[#111]'}`}>
                         {m.role}
@@ -280,6 +291,27 @@ export default function AdminMembers() {
                     />
                   </div>
                 </div>
+
+                {canAddMembers && editingMember && (
+                  <div>
+                    <label className="block text-sm font-medium text-[#111] mb-2">Calendar Color</label>
+                    <div className="flex items-center space-x-3">
+                      {PALETTE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setColor(c)}
+                          className="w-8 h-8 rounded-full border-2 transition-all"
+                          style={{
+                            backgroundColor: c,
+                            borderColor: color === c ? '#111' : 'transparent',
+                            boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px #111' : 'none',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {modalError && (
                   <div className="text-sm text-[#ff4d94] border border-[#ff4d94] p-3 bg-[#ff4d94]/5">

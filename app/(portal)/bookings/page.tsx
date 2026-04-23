@@ -9,9 +9,12 @@ type BookingRow = {
   reference: string;
   client_name: string;
   date: string;
-  start_hour: number;
-  end_hour: number;
+  start_minutes: number;
+  end_minutes: number;
   status: string;
+  payment_status: string | null;
+  total_price: number | null;
+  refund_amount_cents: number | null;
   location: { name: string } | null;
   assigned_member: { name: string } | null;
 };
@@ -21,13 +24,16 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function formatWindow(start: number, end: number) {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(start)}:00 - ${pad(end)}:00`;
+function formatWindow(startMin: number, endMin: number) {
+  const fmt = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return `${fmt(startMin)} - ${fmt(endMin)}`;
 }
 
 function statusLabel(s: string) {
   if (s === 'pending_confirmation') return 'Pending';
+  if (s === 'pending_payment') return 'Awaiting Payment';
+  if (s === 'pending_reschedule_confirmation') return 'Reschedule Pending';
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -35,7 +41,30 @@ function statusClass(s: string) {
   if (s === 'confirmed') return 'bg-[#111] text-white';
   if (s === 'completed') return 'bg-[#e8e6e1] text-[#777]';
   if (s === 'cancelled') return 'border border-[#ff4d94] text-[#ff4d94]';
+  if (s === 'pending_payment') return 'border border-[#e8e6e1] text-[#777]';
+  if (s === 'pending_reschedule_confirmation') return 'bg-violet-100 text-violet-800 border border-violet-300';
   return 'border border-[#111] text-[#111]';
+}
+
+function paymentLabel(p: string | null) {
+  switch (p) {
+    case 'paid': return 'Paid';
+    case 'refunded': return 'Refunded';
+    case 'partially_refunded': return 'Partial Refund';
+    case 'failed': return 'Failed';
+    case 'disputed': return 'Disputed';
+    case 'pending':
+    default: return 'Unpaid';
+  }
+}
+
+function paymentClass(p: string | null) {
+  if (p === 'paid') return 'bg-green-100 text-green-800 border border-green-300';
+  if (p === 'refunded') return 'bg-blue-100 text-blue-800 border border-blue-300';
+  if (p === 'partially_refunded') return 'bg-blue-50 text-blue-700 border border-blue-200';
+  if (p === 'disputed') return 'bg-red-100 text-red-800 border border-red-300';
+  if (p === 'failed') return 'bg-gray-100 text-gray-700 border border-gray-300';
+  return 'bg-[#fcfbf9] text-[#777] border border-[#e8e6e1]';
 }
 
 export default function Bookings() {
@@ -47,11 +76,13 @@ export default function Bookings() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      // Hide abandoned payment attempts: they're noise and get cleaned up by sweep_expired_pending_bookings.
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, reference, client_name, date, start_hour, end_hour, status, location:locations(name), assigned_member:members!bookings_assigned_member_id_fkey(name)')
+        .select('id, reference, client_name, date, start_minutes, end_minutes, status, payment_status, total_price, refund_amount_cents, location:locations(name), assigned_member:members!bookings_assigned_member_id_fkey(name)')
+        .neq('status', 'pending_payment')
         .order('date', { ascending: true })
-        .order('start_hour', { ascending: true });
+        .order('start_minutes', { ascending: true });
       if (error) {
         setError(error.message);
       } else {
@@ -129,6 +160,7 @@ export default function Bookings() {
                         <th className="p-4 font-medium text-[#111]">Location</th>
                         <th className="p-4 font-medium text-[#111]">Assigned To</th>
                         <th className="p-4 font-medium text-[#111]">Status</th>
+                        <th className="p-4 font-medium text-[#111]">Payment</th>
                         <th className="p-4 font-medium text-[#111]">Action</th>
                       </tr>
                     </thead>
@@ -137,7 +169,7 @@ export default function Bookings() {
                         <tr key={b.id} className="border-b border-[#e8e6e1] hover:bg-[#fcfbf9]/50 transition-colors last:border-b-0">
                           <td className="p-4 text-[#ff4d94] font-medium">{b.reference}</td>
                           <td className="p-4 text-[#111] font-medium">{b.client_name}</td>
-                          <td className="p-4 text-[#777]">{formatWindow(b.start_hour, b.end_hour)}</td>
+                          <td className="p-4 text-[#777]">{formatWindow(b.start_minutes, b.end_minutes)}</td>
                           <td className="p-4 text-[#777]">{b.location?.name ?? '—'}</td>
                           <td className="p-4">
                             <span className="inline-flex items-center space-x-1.5 bg-[#fcfbf9] border border-[#e8e6e1] px-2 py-1 text-xs font-medium text-[#111]">
@@ -149,6 +181,14 @@ export default function Bookings() {
                             <span className={`px-2 py-1 text-xs font-medium ${statusClass(b.status)}`}>
                               {statusLabel(b.status)}
                             </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 text-xs font-medium inline-block ${paymentClass(b.payment_status)}`}>
+                              {paymentLabel(b.payment_status)}
+                            </span>
+                            {b.refund_amount_cents && b.refund_amount_cents > 0 ? (
+                              <div className="text-[11px] text-[#777] mt-1">-${(b.refund_amount_cents / 100).toFixed(2)}</div>
+                            ) : null}
                           </td>
                           <td className="p-4">
                             <Link href={`/bookings/${b.id}`} className="text-[#111] hover:text-[#ff4d94] font-medium text-sm underline underline-offset-2">

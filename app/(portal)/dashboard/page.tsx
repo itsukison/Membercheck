@@ -10,8 +10,8 @@ type BookingRow = {
   reference: string;
   client_name: string;
   date: string;
-  start_hour: number;
-  end_hour: number;
+  start_minutes: number;
+  end_minutes: number;
   status: string;
   location: { name: string } | null;
   plan: { name: string } | null;
@@ -22,9 +22,10 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatWindow(start: number, end: number) {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(start)}:00 - ${pad(end)}:00`;
+function formatWindow(startMin: number, endMin: number) {
+  const fmt = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return `${fmt(startMin)} - ${fmt(endMin)}`;
 }
 
 export default function Dashboard() {
@@ -41,17 +42,17 @@ export default function Dashboard() {
     const [pendingRes, todayRes] = await Promise.all([
       supabase
         .from('bookings')
-        .select('id, reference, client_name, date, start_hour, end_hour, status, location:locations(name), plan:plans(name)')
+        .select('id, reference, client_name, date, start_minutes, end_minutes, status, location:locations(name), plan:plans(name)')
         .eq('assigned_member_id', member.id)
-        .eq('status', 'pending_confirmation')
+        .in('status', ['pending_confirmation', 'pending_reschedule_confirmation'])
         .order('date', { ascending: true }),
       supabase
         .from('bookings')
-        .select('id, reference, client_name, date, start_hour, end_hour, status, location:locations(name), plan:plans(name)')
+        .select('id, reference, client_name, date, start_minutes, end_minutes, status, location:locations(name), plan:plans(name)')
         .eq('assigned_member_id', member.id)
         .eq('status', 'confirmed')
         .eq('date', today)
-        .order('start_hour', { ascending: true }),
+        .order('start_minutes', { ascending: true }),
     ]);
 
     if (pendingRes.error || todayRes.error) {
@@ -114,7 +115,9 @@ export default function Dashboard() {
                     <div>
                       <div className="flex justify-between items-start mb-4">
                         <span className="text-[#ff4d94] font-bold tracking-wider uppercase text-sm">{b.reference}</span>
-                        <span className="bg-[#ff4d94]/10 text-[#ff4d94] text-xs px-2 py-1 font-medium">Action Required</span>
+                        <span className={`text-xs px-2 py-1 font-medium ${b.status === 'pending_reschedule_confirmation' ? 'bg-violet-100 text-violet-700' : 'bg-[#ff4d94]/10 text-[#ff4d94]'}`}>
+                          {b.status === 'pending_reschedule_confirmation' ? 'Reschedule Review' : 'Action Required'}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-medium text-[#111]">{b.client_name}</h3>
@@ -124,7 +127,7 @@ export default function Dashboard() {
                       </div>
                       <div className="space-y-3 text-sm text-[#777]">
                         <div className="flex items-center space-x-3"><CalIcon size={16} className="text-[#111]" /><span>{formatDate(b.date)}</span></div>
-                        <div className="flex items-center space-x-3"><Clock size={16} className="text-[#111]" /><span>{formatWindow(b.start_hour, b.end_hour)}</span></div>
+                        <div className="flex items-center space-x-3"><Clock size={16} className="text-[#111]" /><span>{formatWindow(b.start_minutes, b.end_minutes)}</span></div>
                         <div className="flex items-center space-x-3"><MapPin size={16} className="text-[#111]" /><span>{b.location?.name ?? '—'}</span></div>
                       </div>
                     </div>
@@ -151,7 +154,7 @@ export default function Dashboard() {
                     <div key={b.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#fcfbf9] transition-colors">
                       <div className="flex items-center space-x-6">
                         <div className="text-center min-w-[80px]">
-                          <span className="block text-lg font-bold text-[#111]">{b.start_hour.toString().padStart(2, '0')}:00</span>
+                          <span className="block text-lg font-bold text-[#111]">{`${String(Math.floor(b.start_minutes/60)).padStart(2,'0')}:${String(b.start_minutes%60).padStart(2,'0')}`}</span>
                           <span className="block text-xs text-[#777] uppercase tracking-wider">Start</span>
                         </div>
                         <div className="w-px h-12 bg-[#e8e6e1] hidden sm:block"></div>
