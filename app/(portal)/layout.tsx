@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, Users, Briefcase, LayoutDashboard, ClipboardCheck, LogOut, CalendarDays, PanelLeftClose, Menu } from 'lucide-react';
+import { Users, Briefcase, LayoutDashboard, LogOut, CalendarDays, PanelLeftClose, Menu, X } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
 function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { member, loading, signOut } = useAuth();
 
   const navItems = [
@@ -33,56 +34,107 @@ function PortalShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
-    <div className="h-screen w-full bg-[#fcfbf9] flex flex-col md:flex-row overflow-hidden">
-      {/* Sidebar */}
-      <aside className={`border-r border-[#e8e6e1] bg-[#fcfbf9] flex flex-col h-full z-30 transition-all duration-300 ${isCollapsed ? 'hidden md:flex md:-ml-64 md:w-64' : 'w-full md:w-64'}`}>
-        <div className="p-8 flex items-center justify-between">
-          <div>
-            <h1 className="font-serif text-2xl text-[#111]">Shion</h1>
-            <p className="text-xs text-[#777] uppercase tracking-widest mt-1">{member.name}</p>
-          </div>
-          <button 
-            onClick={() => setIsCollapsed(true)} 
+  const handleSignOut = () => {
+    setIsMobileMenuOpen(false);
+    signOut();
+  };
+
+  const nav = (
+    <>
+      <div className="p-6 md:p-8 flex items-center justify-between">
+        <div>
+          <h1 className="font-serif text-2xl text-[#111]">Shion</h1>
+          <p className="text-xs text-[#777] uppercase tracking-widest mt-1">{member.name}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsDesktopCollapsed(true)}
             className="text-[#777] hover:text-[#111] transition-colors hidden md:block"
+            aria-label="Collapse sidebar"
           >
             <PanelLeftClose size={20} />
           </button>
-        </div>
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto flex flex-col pb-4 md:pb-0">
-          {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            const Icon = item.icon;
-            return (
-              <Link 
-                key={item.name} 
-                href={item.href} 
-                className={`flex items-center space-x-3 px-4 py-3 rounded-sm transition-colors whitespace-nowrap ${isActive ? 'bg-[#111] text-white' : 'text-[#777] hover:bg-[#e8e6e1]/50 hover:text-[#111]'}`}
-              >
-                <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
-                <span className="font-medium text-sm">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="p-4 mt-auto border-t border-[#e8e6e1] flex-shrink-0">
           <button
-            onClick={signOut}
-            className="flex items-center space-x-3 px-4 py-3 text-[#777] hover:text-[#111] transition-colors w-full text-left"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="text-[#777] hover:text-[#111] transition-colors md:hidden"
+            aria-label="Close menu"
           >
-            <LogOut size={18} strokeWidth={1.5} />
-            <span className="font-medium text-sm">Sign Out</span>
+            <X size={20} />
           </button>
         </div>
+      </div>
+      <nav className="flex-1 px-4 space-y-2 overflow-y-auto flex flex-col pb-4 md:pb-0">
+        {navItems.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-sm transition-colors whitespace-nowrap ${isActive ? 'bg-[#111] text-white' : 'text-[#777] hover:bg-[#e8e6e1]/50 hover:text-[#111]'}`}
+            >
+              <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
+              <span className="font-medium text-sm">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="p-4 mt-auto border-t border-[#e8e6e1] flex-shrink-0">
+        <button
+          onClick={handleSignOut}
+          className="flex items-center space-x-3 px-4 py-3 text-[#777] hover:text-[#111] transition-colors w-full text-left"
+        >
+          <LogOut size={18} strokeWidth={1.5} />
+          <span className="font-medium text-sm">Sign Out</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen md:h-screen w-full bg-[#fcfbf9] flex flex-col md:flex-row md:overflow-hidden">
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-40 border-b border-[#e8e6e1] bg-[#fcfbf9] px-4 py-3 flex items-center justify-between">
+        <div>
+          <h1 className="font-serif text-xl text-[#111]">Shion</h1>
+          <p className="text-[10px] text-[#777] uppercase tracking-widest mt-0.5">{member.name}</p>
+        </div>
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 border border-[#111] bg-white text-[#111] hover:bg-[#fcfbf9] transition-colors"
+          aria-label="Open navigation"
+        >
+          <Menu size={18} />
+        </button>
+      </header>
+
+      {/* Desktop Sidebar */}
+      <aside className={`border-r border-[#e8e6e1] bg-[#fcfbf9] flex-col h-full z-30 transition-all duration-300 hidden md:flex ${isDesktopCollapsed ? '-ml-64 w-64' : 'w-64'}`}>
+        {nav}
       </aside>
 
+      {/* Mobile Drawer */}
+      {isMobileMenuOpen && (
+        <>
+          <button
+            aria-label="Close navigation backdrop"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 z-40 bg-black/30"
+          />
+          <aside className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-[85%] max-w-xs border-r border-[#e8e6e1] bg-[#fcfbf9] flex flex-col">
+            {nav}
+          </aside>
+        </>
+      )}
+
       {/* Main Content */}
-      <main className="flex-1 relative h-full flex flex-col overflow-hidden">
+      <main className="flex-1 relative h-full flex flex-col min-h-0">
         {/* Hamburger Menu when collapsed */}
-        {isCollapsed && (
+        {isDesktopCollapsed && (
           <div className="absolute top-6 left-6 z-40 hidden md:block">
-            <button 
-              onClick={() => setIsCollapsed(false)}
+            <button
+              onClick={() => setIsDesktopCollapsed(false)}
               className="p-2 bg-white border border-[#111] shadow-[2px_2px_0px_0px_rgba(17,17,17,1)] text-[#111] hover:bg-[#fcfbf9] transition-colors flex items-center justify-center"
             >
               <Menu size={20} />
@@ -99,7 +151,7 @@ function PortalShell({ children }: { children: React.ReactNode }) {
             backgroundPosition: 'center top' 
           }} 
         />
-        <div className={`relative z-10 flex-1 overflow-y-auto p-8 md:p-12 transition-all duration-300 ${isCollapsed ? 'md:pl-20' : ''}`}>
+        <div className={`relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 transition-all duration-300 ${isDesktopCollapsed ? 'md:pl-20' : ''}`}>
           {children}
         </div>
       </main>

@@ -128,16 +128,16 @@ export default function AdminMembers() {
   const canAddMembers = currentMember?.role === 'Leader';
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-6 md:space-y-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="font-serif text-4xl text-[#111]">Team Members</h1>
+          <h1 className="font-serif text-3xl md:text-4xl text-[#111] leading-tight">Team Members</h1>
           <p className="text-[#777] mt-2">Manage photographers and their roles.</p>
         </div>
         {canAddMembers && (
           <button
             onClick={openAddModal}
-            className="bg-[#111] text-white px-6 py-2 font-medium hover:bg-[#ff4d94] transition-colors"
+            className="bg-[#111] text-white px-6 py-2 font-medium hover:bg-[#ff4d94] transition-colors w-full sm:w-auto"
           >
             + Add Member
           </button>
@@ -217,7 +217,7 @@ export default function AdminMembers() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="bg-white border border-[#111] shadow-[8px_8px_0px_0px_rgba(17,17,17,1)] w-full max-w-md p-6 relative"
+              className="bg-white border border-[#111] shadow-[8px_8px_0px_0px_rgba(17,17,17,1)] w-full max-w-md p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setIsModalOpen(false)}

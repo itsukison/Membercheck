@@ -180,22 +180,22 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
   const whatsappHref = b.client_phone ? `https://wa.me/${b.client_phone.replace(/[^\d]/g, '')}` : '#';
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
       <Link href="/bookings" className="inline-flex items-center space-x-2 text-[#777] hover:text-[#111] transition-colors">
         <ArrowLeft size={18} />
         <span>Back to Bookings</span>
       </Link>
 
-      <header className="flex flex-col md:flex-row md:justify-between md:items-start gap-6">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 md:gap-6">
         <div>
-          <div className="flex items-center space-x-3 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="text-[#ff4d94] font-bold tracking-wider uppercase">{b.reference}</span>
             <span className="bg-[#111] text-white text-xs px-2 py-1 font-medium">{statusLabel(b.status)}</span>
             {b.payment_confirmed && (
               <span className="bg-[#ff4d94] text-white text-xs px-2 py-1 font-medium">Paid</span>
             )}
           </div>
-          <h1 className="font-serif text-4xl text-[#111]">{b.client_name}</h1>
+          <h1 className="font-serif text-3xl md:text-4xl text-[#111] leading-tight">{b.client_name}</h1>
           <p className="text-[#777] mt-1">{b.plan?.name ?? '—'}</p>
         </div>
         {b.client_phone && (
@@ -203,7 +203,7 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center space-x-2 bg-[#25D366] text-white px-6 py-3 font-medium hover:bg-[#128C7E] transition-colors shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] border border-[#111]"
+            className="inline-flex items-center justify-center space-x-2 bg-[#25D366] text-white px-4 sm:px-6 py-3 font-medium hover:bg-[#128C7E] transition-colors shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] border border-[#111] w-full sm:w-auto"
           >
             <MessageCircle size={20} />
             <span>Open WhatsApp</span>
@@ -211,9 +211,9 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
         )}
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-8">
-          <section className="bg-white border border-[#111] p-8 shadow-[4px_4px_0px_0px_rgba(17,17,17,1)]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <div className="md:col-span-2 space-y-6 md:space-y-8">
+          <section className="bg-white border border-[#111] p-5 sm:p-6 md:p-8 shadow-[4px_4px_0px_0px_rgba(17,17,17,1)]">
             <h2 className="font-serif text-2xl text-[#111] mb-6 border-b border-[#e8e6e1] pb-2">Event Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
@@ -245,8 +245,8 @@ export default function BookingDetail({ params }: { params: Promise<{ id: string
           </section>
 
           {(b.special_requests || b.retouch_notes) && (
-            <section className="bg-white border border-[#111] p-8 shadow-[4px_4px_0px_0px_rgba(17,17,17,1)]">
-              <h2 className="font-serif text-2xl text-[#111] mb-6 border-b border-[#e8e6e1] pb-2">Client Notes</h2>
+            <section className="bg-white border border-[#111] p-5 sm:p-6 md:p-8 shadow-[4px_4px_0px_0px_rgba(17,17,17,1)]">
+              <h2 className="font-serif text-xl md:text-2xl text-[#111] mb-6 border-b border-[#e8e6e1] pb-2">Client Notes</h2>
               {b.special_requests && (
                 <div className="mb-4">
                   <span className="block text-xs text-[#777] uppercase tracking-wider mb-1">Special Requests</span>

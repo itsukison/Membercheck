@@ -450,26 +450,26 @@ export default function Overview() {
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="font-serif text-4xl text-[#111]">Team Overview</h1>
+          <h1 className="font-serif text-3xl md:text-4xl text-[#111] leading-tight">Team Overview</h1>
           <p className="text-[#777] mt-2">Click empty cells to add your availability. Drag or resize your own blocks.</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full md:w-auto">
           {/* Date picker */}
           <div className="relative" ref={calendarRef}>
             <button
               onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-              className="flex items-center space-x-3 px-4 py-2 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] hover:bg-[#fcfbf9] transition-colors"
+              className="flex items-center space-x-3 px-4 py-2 w-full sm:w-auto bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] hover:bg-[#fcfbf9] transition-colors"
             >
               <CalendarDays size={18} className="text-[#111]" />
               <span className="font-medium text-[#111] min-w-[160px] text-left">{formatWeekRange(weekDays)}</span>
               <ChevronDown size={16} className="text-[#111]" />
             </button>
             {isCalendarOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] z-50 p-4">
+              <div className="absolute top-full left-0 mt-2 w-[calc(100vw-2rem)] max-w-72 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] z-50 p-4">
                 <div className="flex justify-between items-center mb-4">
                   <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="p-1 hover:bg-[#fcfbf9] rounded">
                     <ChevronLeft size={18} />
@@ -509,7 +509,7 @@ export default function Overview() {
           <div className="relative" ref={memberDropdownRef}>
             <button
               onClick={() => setIsMemberDropdownOpen(!isMemberDropdownOpen)}
-              className="flex items-center justify-between w-64 px-4 py-2 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] hover:bg-[#fcfbf9] transition-colors"
+              className="flex items-center justify-between w-full sm:w-64 px-4 py-2 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] hover:bg-[#fcfbf9] transition-colors"
             >
               <span className="font-medium text-[#111]">
                 {selectedMembers.length === members.length ? 'All Members' : `${selectedMembers.length} Selected`}
@@ -517,7 +517,7 @@ export default function Overview() {
               <ChevronDown size={16} className="text-[#111]" />
             </button>
             {isMemberDropdownOpen && (
-              <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] z-50 py-2">
+              <div className="absolute top-full right-0 mt-2 w-full sm:w-64 bg-white border border-[#111] shadow-[4px_4px_0px_0px_rgba(17,17,17,1)] z-50 py-2">
                 <div className="px-3 pb-2 mb-2 border-b border-[#e8e6e1] text-xs font-medium text-[#777] uppercase tracking-wider">Filter by Member</div>
                 {members.map((m) => {
                   const isSelected = selectedMembers.includes(m.id);
@@ -548,7 +548,7 @@ export default function Overview() {
           </div>
         )}
         <div className="overflow-x-auto">
-          <div className="min-w-[800px] flex">
+          <div className="min-w-[900px] flex">
             {/* Time gutter */}
             <div className="w-20 border-r border-[#111] bg-[#fcfbf9] shrink-0">
               <div className="h-12 border-b border-[#111]" />

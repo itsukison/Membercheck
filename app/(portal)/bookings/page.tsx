@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Search, CalendarDays } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -72,9 +72,20 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const hasAutoScrolled = useRef(false);
+
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, []);
 
   useEffect(() => {
     (async () => {
+      hasAutoScrolled.current = false;
       setLoading(true);
       // Hide abandoned payment attempts: they're noise and get cleaned up by sweep_expired_pending_bookings.
       const { data, error } = await supabase
@@ -112,14 +123,29 @@ export default function Bookings() {
     return Array.from(map.entries());
   }, [filtered]);
 
+  useEffect(() => {
+    if (loading || hasAutoScrolled.current || grouped.length === 0 || search.trim()) return;
+
+    const dates = grouped.map(([date]) => date);
+    const targetDate = dates.includes(todayIso)
+      ? todayIso
+      : (dates.find((date) => date >= todayIso) ?? dates[dates.length - 1]);
+
+    const targetElement = sectionRefs.current[targetDate];
+    if (!targetElement) return;
+
+    targetElement.scrollIntoView({ behavior: 'auto', block: 'start' });
+    hasAutoScrolled.current = true;
+  }, [grouped, loading, search, todayIso]);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="font-serif text-4xl text-[#111]">Bookings</h1>
+          <h1 className="font-serif text-3xl md:text-4xl text-[#111] leading-tight">Bookings</h1>
           <p className="text-[#777] mt-2">Manage and view all scheduled shoots.</p>
         </div>
-        <div className="flex space-x-4">
+        <div className="flex w-full md:w-auto space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#777]" size={18} />
             <input
@@ -127,7 +153,7 @@ export default function Bookings() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search reference or client..."
-              className="pl-10 pr-4 py-2 border border-[#111] bg-white focus:outline-none focus:border-[#ff4d94]"
+              className="w-full md:w-auto min-w-[250px] pl-10 pr-4 py-2 border border-[#111] bg-white focus:outline-none focus:border-[#ff4d94]"
             />
           </div>
         </div>
@@ -144,8 +170,8 @@ export default function Bookings() {
       ) : (
         <div className="space-y-10">
           {grouped.map(([date, bookings]) => (
-            <div key={date} className="space-y-4">
-              <h2 className="font-serif text-2xl text-[#111] flex items-center space-x-2 border-b border-[#e8e6e1] pb-2">
+            <div key={date} ref={(el) => { sectionRefs.current[date] = el; }} className="space-y-4">
+              <h2 className="font-serif text-xl md:text-2xl text-[#111] flex items-center space-x-2 border-b border-[#e8e6e1] pb-2">
                 <CalendarDays size={20} className="text-[#ff4d94]" />
                 <span>{formatDate(date)}</span>
               </h2>
