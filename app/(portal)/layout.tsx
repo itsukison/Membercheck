@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Briefcase, LayoutDashboard, LogOut, CalendarDays, PanelLeftClose, Menu, X } from 'lucide-react';
+import { Users, Briefcase, LayoutDashboard, LogOut, CalendarDays, PanelLeftClose, Menu, X, BarChart2 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,7 @@ function PortalShell({ children }: { children: React.ReactNode }) {
     { name: 'Overview', href: '/overview', icon: CalendarDays },
     { name: 'Bookings', href: '/bookings', icon: Briefcase },
     { name: 'Team Members', href: '/admin/members', icon: Users },
+    { name: 'Analytics', href: '/analytics', icon: BarChart2 },
   ];
 
   if (loading || !member) {
