@@ -43,9 +43,33 @@ export async function POST(
     return NextResponse.json({ error: 'No Stripe payment associated with this booking.' }, { status: 409 });
   }
 
-  const totalCents = (bookingRow.total_price as number) * 100;
+  // Fetch the real captured amount and what Stripe has already refunded.
+  // Handles coupons (charge.amount < total_price) and out-of-band Stripe dashboard refunds.
+  let capturedCents = 0;
+  let stripeAlreadyRefunded = 0;
+  try {
+    if (bookingRow.stripe_charge_id) {
+      const ch = await stripe.charges.retrieve(bookingRow.stripe_charge_id);
+      capturedCents = ch.amount;
+      stripeAlreadyRefunded = ch.amount_refunded;
+    } else {
+      const pi = await stripe.paymentIntents.retrieve(bookingRow.stripe_payment_intent_id!, {
+        expand: ['latest_charge'],
+      });
+      const ch = pi.latest_charge;
+      if (!ch || typeof ch === 'string') {
+        return NextResponse.json({ error: 'Could not resolve charge for this payment.' }, { status: 409 });
+      }
+      capturedCents = ch.amount;
+      stripeAlreadyRefunded = ch.amount_refunded;
+    }
+  } catch (err) {
+    console.error('[admin refund] Failed to retrieve charge from Stripe', err);
+    return NextResponse.json({ error: 'Could not verify refundable amount with Stripe.' }, { status: 502 });
+  }
+
   const alreadyRefunded = (bookingRow.refund_amount_cents as number) ?? 0;
-  const remaining = Math.max(0, totalCents - alreadyRefunded);
+  const remaining = Math.max(0, capturedCents - stripeAlreadyRefunded);
   if (remaining <= 0) return NextResponse.json({ error: 'Nothing left to refund.' }, { status: 409 });
 
   const amountCents = Math.min(body.amountCents && body.amountCents > 0 ? body.amountCents : remaining, remaining);
@@ -82,6 +106,7 @@ export async function POST(
         p_booking_id: id,
         p_refund_amount_cents: amountCents,
         p_stripe_refund_id: refundId,
+        p_captured_cents: capturedCents,
       });
       if (applyErr) console.error('[admin refund] apply_booking_cancellation failed', applyErr.message);
     } else {
@@ -90,7 +115,7 @@ export async function POST(
         .from('bookings')
         .update({
           refund_amount_cents: alreadyRefunded + amountCents,
-          payment_status: alreadyRefunded + amountCents >= totalCents ? 'refunded' : 'partially_refunded',
+          payment_status: alreadyRefunded + amountCents >= capturedCents ? 'refunded' : 'partially_refunded',
           refunded_at: new Date().toISOString(),
           stripe_refund_id: refundId,
         })
@@ -103,7 +128,7 @@ export async function POST(
       .from('bookings')
       .update({
         refund_amount_cents: newRefundTotal,
-        payment_status: newRefundTotal >= totalCents ? 'refunded' : 'partially_refunded',
+        payment_status: newRefundTotal >= capturedCents ? 'refunded' : 'partially_refunded',
         refunded_at: new Date().toISOString(),
         stripe_refund_id: refundId,
       })
