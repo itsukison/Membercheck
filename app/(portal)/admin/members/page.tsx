@@ -109,7 +109,7 @@ export default function AdminMembers() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ name, email, password, role, status }),
+        body: JSON.stringify({ name, email, password, role, status, color }),
       });
 
       if (!res.ok) {
@@ -292,26 +292,24 @@ export default function AdminMembers() {
                   </div>
                 </div>
 
-                {canAddMembers && editingMember && (
-                  <div>
-                    <label className="block text-sm font-medium text-[#111] mb-2">Calendar Color</label>
-                    <div className="flex items-center space-x-3">
-                      {PALETTE_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setColor(c)}
-                          className="w-8 h-8 rounded-full border-2 transition-all"
-                          style={{
-                            backgroundColor: c,
-                            borderColor: color === c ? '#111' : 'transparent',
-                            boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px #111' : 'none',
-                          }}
-                        />
-                      ))}
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#111] mb-2">Calendar Color</label>
+                  <div className="flex items-center space-x-3">
+                    {PALETTE_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setColor(c)}
+                        className="w-8 h-8 rounded-full border-2 transition-all"
+                        style={{
+                          backgroundColor: c,
+                          borderColor: color === c ? '#111' : 'transparent',
+                          boxShadow: color === c ? '0 0 0 2px #fff, 0 0 0 4px #111' : 'none',
+                        }}
+                      />
+                    ))}
                   </div>
-                )}
+                </div>
 
                 {modalError && (
                   <div className="text-sm text-[#ff4d94] border border-[#ff4d94] p-3 bg-[#ff4d94]/5">

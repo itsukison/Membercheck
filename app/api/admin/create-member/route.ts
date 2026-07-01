@@ -7,6 +7,7 @@ type CreateMemberBody = {
   password: string;
   role: 'Photographer' | 'Leader';
   status?: 'Active' | 'On Leave' | 'Inactive';
+  color?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const { name, email, password, role, status } = body;
+  const { name, email, password, role, status, color } = body;
   if (!name || !email || !password || !role) {
     return NextResponse.json(
       { error: 'name, email, password, and role are required.' },
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
     email,
     role,
     status: status ?? 'Active',
+    color: color ?? '#3b82f6',
   });
 
   if (insertError) {

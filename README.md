@@ -1,20 +1,84 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Shion — Photography Studio Staff Portal
 
-# Run and deploy your AI Studio app
+Internal team operations dashboard for the Shion photography studio. Manage team members, bookings, availability, and analytics.
 
-This contains everything you need to run your app locally.
+## Tech Stack
 
-View your app in AI Studio: https://ai.studio/apps/ae91e087-5935-428e-b038-0700bd614845
+- **Framework:** Next.js 15 (React 19, App Router)
+- **Auth:** Supabase Auth (email/password, JWTs)
+- **Database:** Supabase (PostgreSQL)
+- **Styling:** Tailwind CSS 4
+- **Payments:** Stripe SDK
+- **Animation:** Motion (`motion/react`)
+- **Icons:** Lucide React
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+   SUPABASE_SERVICE_ROLE_KEY=
+   ```
+
+3. Run the development server:
+   ```
+   npm run dev
+   ```
+
+## Architecture
+
+### Route Structure
+
+| Route | Description |
+|---|---|
+| `/` | Landing page |
+| `/login` | Staff login |
+| `/signup` | Staff self-registration (studio code required) |
+| `/dashboard` | Welcome screen with pending/today bookings |
+| `/overview` | Weekly calendar with availability & bookings |
+| `/bookings` | Full bookings table |
+| `/bookings/[id]` | Single booking detail |
+| `/admin/members` | Team member CRUD |
+
+### Auth Flow
+
+- Authentication is handled via `AuthContext` (`lib/AuthContext.tsx`).
+- On load, the portal layout verifies the session and fetches the member record from the `members` table.
+- Members with `status !== 'Active'` are signed out.
+- Two roles: **Photographer** (manage own availability) and **Leader** (manage all members, process refunds).
+
+### Database
+
+The schema lives in Supabase (no local migrations). Key tables:
+
+- **`members`** — `id`, `name`, `email`, `role`, `status`, `color`
+- **`bookings`** — client bookings linked to members via `assigned_member_id`
+- **`availability_slots`** — member availability with join table `availability_slot_locations`
+- **`locations`** — studio locations
+- **`plans`** — session plans/durations
+
+## Member Colors
+
+Each member has a `color` field (hex value) used to distinguish them in the weekly overview calendar. The palette includes 5 colors: pink, blue, green, amber, violet. Members can change their own color via the **Team Members** page. Leaders can set the color when creating or editing any member.
+
+## Environment Variables
+
+See `.env.example` for all required variables:
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (admin operations)
+- `RESEND_API_KEY` — (optional) for email notifications
+
+## Build
+
+```
+npm run build
+```
+
+Outputs a standalone Next.js build to `.next/`.

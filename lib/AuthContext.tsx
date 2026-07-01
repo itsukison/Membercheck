@@ -10,6 +10,7 @@ export type Member = {
   role: 'Photographer' | 'Leader';
   email: string;
   status: 'Active' | 'On Leave' | 'Inactive';
+  color: string;
 };
 
 type AuthContextType = {
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from('members')
-        .select('id, name, role, email, status')
+        .select('id, name, role, email, status, color')
         .eq('id', session.user.id)
         .maybeSingle();
 
