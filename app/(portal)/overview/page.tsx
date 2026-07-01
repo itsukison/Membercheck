@@ -152,23 +152,23 @@ export default function Overview() {
   const weekDays  = getWeekDays(currentDate);
   const monthDays = getMonthDays(calendarMonth.getFullYear(), calendarMonth.getMonth());
 
-  // Fetch members (with color) & locations on mount
-  useEffect(() => {
-    (async () => {
-      const [{ data: mData, error: mErr }, { data: lData, error: lErr }] = await Promise.all([
-        supabase.from('members').select('id, name, color').order('created_at', { ascending: true }),
-        supabase.from('locations').select('id, name').order('sort_order', { ascending: true }),
-      ]);
-      if (mErr || lErr) { setError(mErr?.message ?? lErr?.message ?? 'Failed to load.'); return; }
-      setMembers((mData ?? []) as Member[]);
-      setSelectedMembers((mData ?? []).map((m: { id: string }) => m.id));
-      setLocations((lData ?? []) as Location[]);
-    })();
-  }, []);
-
   const loadEventsForWeek = useCallback(async () => {
-    if (members.length === 0 || locations.length === 0) return;
     setLoading(true);
+
+    // Fetch members & locations fresh every time so color changes are picked up
+    const [{ data: mData, error: mErr }, { data: lData, error: lErr }] = await Promise.all([
+      supabase.from('members').select('id, name, color').order('created_at', { ascending: true }),
+      supabase.from('locations').select('id, name').order('sort_order', { ascending: true }),
+    ]);
+    if (mErr || lErr) { setError(mErr?.message ?? lErr?.message ?? 'Failed to load.'); setLoading(false); return; }
+
+    const freshMembers = (mData ?? []) as Member[];
+    const freshLocations = (lData ?? []) as Location[];
+
+    setMembers(freshMembers);
+    setSelectedMembers((prev) => prev.length === 0 ? freshMembers.map((m: Member) => m.id) : prev);
+    setLocations(freshLocations);
+
     const week      = getWeekDays(currentDate);
     const startDate = formatDate(week[0]);
     const endDate   = formatDate(week[6]);
@@ -193,7 +193,7 @@ export default function Overview() {
       return;
     }
 
-    const locMap = new Map(locations.map((l) => [l.id, l.name]));
+    const locMap = new Map(freshLocations.map((l) => [l.id, l.name]));
 
     const availEvents: Event[] = (availRes.data ?? []).map((row: {
       id: string; member_id: string; date: string;
@@ -232,7 +232,7 @@ export default function Overview() {
     setEvents([...availEvents, ...bookingEvents]);
     setError(null);
     setLoading(false);
-  }, [currentDate, members, locations]);
+  }, [currentDate]);
 
   useEffect(() => { loadEventsForWeek(); }, [loadEventsForWeek]);
 

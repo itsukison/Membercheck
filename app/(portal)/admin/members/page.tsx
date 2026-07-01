@@ -78,13 +78,25 @@ export default function AdminMembers() {
     const email = formData.get('email') as string;
 
     if (editingMember) {
-      const { error } = await supabase
-        .from('members')
-        .update({ name, role, status, color })
-        .eq('id', editingMember.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setModalError('Not signed in.');
+        setSaving(false);
+        return;
+      }
 
-      if (error) {
-        setModalError(error.message);
+      const res = await fetch('/api/admin/update-member', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ id: editingMember.id, name, role, status, color }),
+      });
+
+      if (!res.ok) {
+        const { error: errMsg } = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setModalError(errMsg ?? 'Failed to update member.');
         setSaving(false);
         return;
       }
